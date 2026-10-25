@@ -2,8 +2,8 @@ from django.shortcuts import render, redirect
 from .models import HoneypotHit
 
 def home_redirect(request):
-    """Main landing page redirects to login page."""
-    return redirect('login')
+    """Show the public landing page at the site root."""
+    return redirect('index')
 
 def decoy_admin(request):
     HoneypotHit.objects.create(
