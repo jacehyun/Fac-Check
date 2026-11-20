@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import render, redirect 
 from django.http import JsonResponse
 from .forms import ContactForm, LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm, is_unverified_signup
@@ -27,6 +29,9 @@ from django.utils import timezone
 from django.db import transaction
 from smtplib import SMTPException
 from django.utils.http import url_has_allowed_host_and_scheme #helps with redirecting users together with the next parameter.
+
+
+logger = logging.getLogger(__name__)
 
 
 def contact(request):
@@ -392,7 +397,13 @@ def login_view(request):
                            recipient_list=[user.email],
                            fail_silently=False,
                        )
-                   except (SMTPException, OSError):
+                   except (SMTPException, OSError) as exc:
+                       logger.warning(
+                           "Login code email failed (error=%s, smtp_status=%s, errno=%s)",
+                           type(exc).__name__,
+                           getattr(exc, "smtp_code", None),
+                           getattr(exc, "errno", None),
+                       )
                        _clear_messages(request)
                        messages.error(request, "We couldn't send your login code right now. Please try again in a moment.")
                        return render(request, 'accounts/login.html', {'form': LoginForm()})
