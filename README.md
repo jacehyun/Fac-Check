@@ -23,7 +23,7 @@ The deployed application uses a TensorFlow/Keras model. Its [seven categories](m
 | Data and uploads | PostgreSQL, Cloudinary |
 | Live notifications | Django Channels and Redis |
 | Photo classification | TensorFlow and Keras |
-| Support and outputs | Gemini FAQ chatbot, SMTP email, xhtml2pdf |
+| Support and outputs | Gemini FAQ chatbot, SMTP or Gmail API email, xhtml2pdf |
 
 ## Run locally
 
@@ -61,7 +61,7 @@ Start with [`.env.example`](.env.example). Keep actual credentials in your local
 | `REDIS_URL` | Redis-compatible connection URL, required when `DEBUG=False` |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Cloudinary credentials for uploaded media |
 | `GEMINI_API_KEY` | Key for the FAQ chatbot |
-| `EMAIL_HOST_PASSWORD` | SMTP password or SMTP key from your email provider |
+| `EMAIL_HOST_PASSWORD` | SMTP password or SMTP key when using the default SMTP backend |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_FROM_ADDRESS` | SMTP endpoint, login, and verified sender address. The defaults are for Gmail. |
 
 ## Deploy on Render
@@ -80,6 +80,24 @@ Create a **Python Web Service** from this repository's `main` branch. For a Free
 - For Brevo on Render Free, set `EMAIL_HOST=smtp-relay.brevo.com` and `EMAIL_PORT=2525`. Use the Brevo SMTP login, SMTP key, and verified sender address for the corresponding email variables.
 - Fac-Check reads the generated `.onrender.com` hostname and HTTPS URL automatically. For a custom domain, set `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, and `SITE_URL`.
 - [`build.sh`](build.sh) installs dependencies, builds Tailwind CSS, collects static files, and runs Django migrations against `DATABASE_URL`. Back up an existing database before deploying schema changes. Before sharing the deployment, test verification email delivery, photo classification, and live notifications.
+
+### Use Gmail on Render Free
+
+Render Free blocks outbound Gmail SMTP ports. Use the Gmail API over HTTPS to send from the Fac-Check Gmail account.
+
+1. Enable the [Gmail API](https://developers.google.com/workspace/gmail/api/quickstart/python) in a Google Cloud project and create a **Desktop app** OAuth client. Choose the send-only [`gmail.send` scope](https://developers.google.com/workspace/gmail/api/auth/scopes).
+2. Authorize the client from the Fac-Check sender account using the [installed app OAuth flow](https://developers.google.com/identity/protocols/oauth2/native-app) with offline access. Store the resulting refresh token privately alongside the client ID and secret. Google issues refresh tokens that expire after seven days for External projects in Testing mode with this scope. [Refresh token rules](https://developers.google.com/identity/protocols/oauth2#expiration)
+3. Test mail from the sender account before changing the live service. When ready, set the following values in Render's Environment settings and deploy.
+
+```dotenv
+EMAIL_BACKEND=accounts.email_backends.GmailAPIBackend
+EMAIL_FROM_ADDRESS=facchecknoreply@gmail.com
+GMAIL_CLIENT_ID=
+GMAIL_CLIENT_SECRET=
+GMAIL_REFRESH_TOKEN=
+```
+
+The Gmail account granting access must match `EMAIL_FROM_ADDRESS`. Keep secrets in Render's environment settings or a private local `.env`.
 
 ## Repository layout
 

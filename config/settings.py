@@ -223,13 +223,18 @@ AUTH_PASSWORD_VALIDATORS = [
 
 GEMINI_API_KEY = config('GEMINI_API_KEY')
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = True
 EMAIL_TIMEOUT = 10
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="facchecknoreply@gmail.com")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+if EMAIL_BACKEND == "accounts.email_backends.GmailAPIBackend":
+    GMAIL_CLIENT_ID = config("GMAIL_CLIENT_ID")
+    GMAIL_CLIENT_SECRET = config("GMAIL_CLIENT_SECRET")
+    GMAIL_REFRESH_TOKEN = config("GMAIL_REFRESH_TOKEN")
+else:
+    EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
 EMAIL_FROM_ADDRESS = config("EMAIL_FROM_ADDRESS", default="facchecknoreply@gmail.com")
 DEFAULT_FROM_EMAIL = f"Fac-Check <{EMAIL_FROM_ADDRESS}>"
 # EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
