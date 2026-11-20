@@ -91,7 +91,7 @@ Render Free blocks outbound Gmail SMTP ports. Use the Gmail API over HTTPS to se
 
 ```dotenv
 EMAIL_BACKEND=accounts.email_backends.GmailAPIBackend
-EMAIL_FROM_ADDRESS=facchecknoreply@gmail.com
+EMAIL_FROM_ADDRESS=faccheck.help@gmail.com
 GMAIL_CLIENT_ID=
 GMAIL_CLIENT_SECRET=
 GMAIL_REFRESH_TOKEN=
