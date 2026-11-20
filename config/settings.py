@@ -223,14 +223,23 @@ AUTH_PASSWORD_VALIDATORS = [
 
 GEMINI_API_KEY = config('GEMINI_API_KEY')
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = True
 EMAIL_TIMEOUT = 10
-EMAIL_HOST_USER = 'facchecknoreply@gmail.com'
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')   # Gmail App Password, stored in .env
-DEFAULT_FROM_EMAIL = 'Fac-Check <facchecknoreply@gmail.com>'
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="facchecknoreply@gmail.com")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+EMAIL_FROM_ADDRESS = config("EMAIL_FROM_ADDRESS", default="facchecknoreply@gmail.com")
+DEFAULT_FROM_EMAIL = f"Fac-Check <{EMAIL_FROM_ADDRESS}>"
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_TIMEOUT = 10
+# EMAIL_HOST_USER = 'facchecknoreply@gmail.com'
+# EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')   # Gmail App Password, stored in .env
+# DEFAULT_FROM_EMAIL = 'Fac-Check <facchecknoreply@gmail.com>'
 # Base of the links in notification emails. On Render it falls back to the service's own
 # https address; set SITE_URL when using a custom domain.
 SITE_URL = (config('SITE_URL', default='') or config('RENDER_EXTERNAL_URL', default='')

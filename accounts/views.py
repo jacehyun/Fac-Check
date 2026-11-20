@@ -63,7 +63,7 @@ def contact(request):
                 # in the display name; Reply-To sends your answer straight to them.
                 EmailMessage(
                     subject=f"Fac-Check Contact: New message from {sender_name}", body=body,
-                    from_email=formataddr((f"{sender_name} via Fac-Check", settings.EMAIL_HOST_USER)),
+                    from_email=formataddr((f"{sender_name} via Fac-Check", settings.EMAIL_FROM_ADDRESS)), # was a settings.EMAIL_HOST_USER before
                     to=[settings.CONTACT_EMAIL], reply_to=[formataddr((sender_name, data['email']))],
                 ).send(fail_silently=False)
             except (OSError, SMTPException):
