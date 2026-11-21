@@ -4,7 +4,9 @@ from pathlib import Path
 from threading import Lock, Thread
 
 ML_DIR = Path(__file__).resolve().parent
-MODEL_PATH = ML_DIR / "faccheck_cnn_model.keras"
+# Original TensorFlow model path for rollback.
+# MODEL_PATH = ML_DIR / "faccheck_cnn_model.keras"
+MODEL_PATH = ML_DIR / "faccheck_cnn_model.tflite"
 LABELS_PATH = ML_DIR / "class_labels.json"
 CONFIG_PATH = ML_DIR / "inference_config.json"
 
@@ -43,14 +45,40 @@ class ImageDecodeError(ValueError):
     """The uploaded file is not an image the model can read."""
 
 
+# Original TensorFlow loader for rollback. Restore the model path,
+# the two Keras predict calls below, and the commented requirements.
+# def _load_model():
+#     global MODEL
+#     if MODEL is None:
+#         with _MODEL_LOCK:
+#             if MODEL is None:
+#                 import tensorflow as tf
+#                 MODEL = tf.keras.models.load_model(MODEL_PATH, compile=False)
+#     return MODEL
+
+
 def _load_model():
     global MODEL
-    if MODEL is None:
-        with _MODEL_LOCK:
-            if MODEL is None:
-                import tensorflow as tf
-                MODEL = tf.keras.models.load_model(MODEL_PATH, compile=False)
-    return MODEL
+
+    with _MODEL_LOCK:
+        if MODEL is None:
+            from ai_edge_litert.interpreter import Interpreter
+
+            interpreter = Interpreter(model_path=str(MODEL_PATH), num_threads=1)
+            interpreter.allocate_tensors()
+            input_index = interpreter.get_input_details()[0]["index"]
+            output_index = interpreter.get_output_details()[0]["index"]
+            MODEL = (interpreter, input_index, output_index)
+
+        return MODEL
+
+
+def _predict_scores(image_array):
+    interpreter, input_index, output_index = _load_model()
+    with _INFERENCE_LOCK:
+        interpreter.set_tensor(input_index, image_array)
+        interpreter.invoke()
+        return interpreter.get_tensor(output_index)[0]
 
 
 def _warm_model():
@@ -58,11 +86,16 @@ def _warm_model():
     try:
         import numpy as np
 
-        model = _load_model()
-        image_shape = tuple(CONFIG["image_size"]) + (3,)
-        sample = np.zeros((1, *image_shape), dtype=np.float32)
-        with _INFERENCE_LOCK:
-            model.predict(sample, verbose=0)
+        # Original TensorFlow warm-up:
+        # model = _load_model()
+        # image_shape = tuple(CONFIG["image_size"]) + (3,)
+        # sample = np.zeros((1, *image_shape), dtype=np.float32)
+        # with _INFERENCE_LOCK:
+        #     model.predict(sample, verbose=0)
+
+        width, height = CONFIG["image_size"]
+        sample = np.zeros((1, height, width, 3), dtype=np.float32)
+        _predict_scores(sample)
     except Exception:
         logger.exception("CNN model background warm-up failed")
     finally:
@@ -71,7 +104,7 @@ def _warm_model():
 
 
 def warm_model_async():
-    """Load and trace inference in the background before the first upload."""
+    """Load and warm up the interpreter before the first upload."""
     global _WARMUP_STARTED
     if MODEL is not None:
         return
@@ -100,9 +133,11 @@ def predict_image(image_file):
     image_array = np.asarray(image, dtype=np.float32)
     image_array = np.expand_dims(image_array, axis=0)
 
-    model = _load_model()
-    with _INFERENCE_LOCK:
-        predictions = model.predict(image_array, verbose=0)[0]
+    # Original TensorFlow prediction:
+    # model = _load_model()
+    # with _INFERENCE_LOCK:
+    #     predictions = model.predict(image_array, verbose=0)[0]
+    predictions = _predict_scores(image_array)
 
     sorted_indices = np.argsort(predictions)[::-1]
 

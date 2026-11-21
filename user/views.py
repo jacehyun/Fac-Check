@@ -755,6 +755,8 @@ def predictCategory(request):
     except Exception:
         logger.exception("CNN prediction failed")
         request.session[CNN_FAILED_SESSION_KEY] = _photo_digest(photo)
+        # Django skips the session save for 5xx responses.
+        request.session.save()
         return JsonResponse({
             'success': False,
             'error': "AI categorization is unavailable right now. Try again or choose a category manually.",

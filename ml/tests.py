@@ -1,7 +1,5 @@
-import sys
-import types
 from io import BytesIO
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import numpy as np
 from django.test import SimpleTestCase
@@ -10,15 +8,23 @@ from PIL import Image
 from . import predictor
 
 
-class FakeKerasModel:
+class FakeLiteRTInterpreter:
     def __init__(self, output):
         self.output = np.asarray([output], dtype=np.float32)
         self.input_array = None
-        self.predict_calls = 0
+        self.invoke_calls = 0
 
-    def predict(self, image_array, verbose=0):
-        self.predict_calls += 1
+    def set_tensor(self, index, image_array):
+        if index != 0:
+            raise ValueError("Unexpected input tensor index")
         self.input_array = np.array(image_array, copy=True)
+
+    def invoke(self):
+        self.invoke_calls += 1
+
+    def get_tensor(self, index):
+        if index != 1:
+            raise ValueError("Unexpected output tensor index")
         return self.output
 
 
@@ -29,30 +35,30 @@ def _png(color, size=(8, 8)):
     return buffer
 
 
-class KerasInferenceTests(SimpleTestCase):
+class LiteRTInferenceTests(SimpleTestCase):
     def setUp(self):
         self.previous_model = predictor.MODEL
         predictor.MODEL = None
         self.addCleanup(setattr, predictor, 'MODEL', self.previous_model)
 
     def test_model_loads_only_when_requested_and_is_reused(self):
-        model = Mock()
-        tensorflow = types.SimpleNamespace(
-            keras=types.SimpleNamespace(
-                models=types.SimpleNamespace(load_model=Mock(return_value=model))
-            )
-        )
+        with patch("ai_edge_litert.interpreter.Interpreter") as interpreter_class:
+            interpreter = interpreter_class.return_value
+            interpreter.get_input_details.return_value = [{"index": 0}]
+            interpreter.get_output_details.return_value = [{"index": 1}]
 
-        with patch.dict(sys.modules, {'tensorflow': tensorflow}):
             self.assertIsNone(predictor.MODEL)
-            self.assertIs(predictor._load_model(), model)
-            self.assertIs(predictor._load_model(), model)
+            loaded = predictor._load_model()
+            self.assertEqual(loaded, (interpreter, 0, 1))
+            self.assertIs(predictor._load_model(), loaded)
 
-        self.assertEqual(predictor.MODEL_PATH.name, 'faccheck_cnn_model.keras')
-        tensorflow.keras.models.load_model.assert_called_once_with(
-            predictor.MODEL_PATH,
-            compile=False,
+        self.assertEqual(predictor.MODEL_PATH.name, "faccheck_cnn_model.tflite")
+        self.assertTrue(predictor.MODEL_PATH.with_suffix(".keras").is_file())
+        interpreter_class.assert_called_once_with(
+            model_path=str(predictor.MODEL_PATH),
+            num_threads=1,
         )
+        interpreter.allocate_tensors.assert_called_once_with()
 
     def test_class_labels_match_config_and_category_map(self):
         self.assertEqual(predictor.CONFIG['class_names'], predictor.CLASS_NAMES)
@@ -60,10 +66,10 @@ class KerasInferenceTests(SimpleTestCase):
 
     def test_prediction_uses_raw_rgb_224_and_existing_result_contract(self):
         probabilities = [0.02, 0.90, 0.01, 0.02, 0.02, 0.02, 0.01]
-        model = FakeKerasModel(probabilities)
+        model = FakeLiteRTInterpreter(probabilities)
         image_bytes = _png((255, 128, 0))
 
-        with patch.object(predictor, '_load_model', return_value=model):
+        with patch.object(predictor, '_load_model', return_value=(model, 0, 1)):
             result = predictor.predict_image(image_bytes)
 
         self.assertEqual(model.input_array.shape, (1, 224, 224, 3))
@@ -80,9 +86,9 @@ class KerasInferenceTests(SimpleTestCase):
         self.assertEqual(image_bytes.tell(), 0)
 
     def test_low_confidence_and_margin_keep_others_fallback(self):
-        model = FakeKerasModel([0.26, 0.25, 0.20, 0.10, 0.08, 0.06, 0.05])
+        model = FakeLiteRTInterpreter([0.26, 0.25, 0.20, 0.10, 0.08, 0.06, 0.05])
 
-        with patch.object(predictor, '_load_model', return_value=model):
+        with patch.object(predictor, '_load_model', return_value=(model, 0, 1)):
             result = predictor.predict_image(_png('white'))
 
         self.assertEqual(result['raw_label'], 'Carpentry Masonry')
@@ -116,14 +122,14 @@ class KerasInferenceTests(SimpleTestCase):
         thread.return_value.start.assert_called_once()
 
     def test_background_warmup_runs_first_inference(self):
-        model = FakeKerasModel([0.1] * len(predictor.CLASS_NAMES))
+        model = FakeLiteRTInterpreter([0.1] * len(predictor.CLASS_NAMES))
         previous_started = predictor._WARMUP_STARTED
         predictor._WARMUP_STARTED = True
         self.addCleanup(setattr, predictor, '_WARMUP_STARTED', previous_started)
 
-        with patch.object(predictor, '_load_model', return_value=model):
+        with patch.object(predictor, '_load_model', return_value=(model, 0, 1)):
             predictor._warm_model()
 
-        self.assertEqual(model.predict_calls, 1)
+        self.assertEqual(model.invoke_calls, 1)
         self.assertEqual(model.input_array.shape, (1, 224, 224, 3))
         self.assertFalse(predictor._WARMUP_STARTED)

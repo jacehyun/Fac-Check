@@ -2,6 +2,7 @@ from io import BytesIO
 from unittest.mock import patch
 
 import numpy as np
+from cloudinary import CloudinaryImage
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -28,6 +29,10 @@ class CnnReportFlowTests(TestCase):
     """Upload photo -> CNN prediction -> category shown -> report saved, using the real model."""
 
     def setUp(self):
+        self.enterContext(patch(
+            'cloudinary.uploader.upload_resource',
+            return_value=CloudinaryImage('test/faccheck-report', format='png'),
+        ))
         self.user = User.objects.create_user(username='cnn-reporter', password='test-password')
         UserProfile.objects.create(user=self.user, role='student', department='CCS')
         self.client.force_login(self.user)
@@ -71,7 +76,7 @@ class CnnReportFlowTests(TestCase):
         predict.assert_called_once()  # submission reused the stored result
 
         report = Report.objects.get(user=self.user)
-        self.assertEqual(predictor.MODEL_PATH.name, 'faccheck_cnn_model.keras')
+        self.assertEqual(predictor.MODEL_PATH.name, 'faccheck_cnn_model.tflite')
         self.assertEqual(report.category, shown['category'])
         self.assertEqual(report.cnn_raw_prediction, shown['raw_prediction'])
         self.assertAlmostEqual(report.cnn_confidence, shown['confidence'], places=6)
