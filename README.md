@@ -86,7 +86,7 @@ To set up another instance, create a **Python Web Service** from `main` and sele
 
 ### Gmail API on Render Free
 
-The live service sends login codes, account verification, and notifications through the Gmail API as `faccheck.help@gmail.com`. The API uses HTTPS. Render Free blocks outbound connections on the standard SMTP ports `25`, `465`, and `587`. [Render Free networking limits](https://render.com/docs/free#other-limitations)
+The live service sends login codes, account verification, and notifications through the Gmail API over HTTPS. Render Free blocks outbound connections on the standard SMTP ports `25`, `465`, and `587`. [Render Free networking limits](https://render.com/docs/free#other-limitations)
 
 1. Enable the [Gmail API](https://developers.google.com/workspace/gmail/api/quickstart/python) in a Google Cloud project and create a **Desktop app** OAuth client. Choose the send-only [`gmail.send` scope](https://developers.google.com/workspace/gmail/api/auth/scopes).
 2. For an External OAuth app, set its publishing status to **In production** before authorizing the sender for the live service. Google issues refresh tokens that expire after seven days for External apps in **Testing** with this scope. [Refresh token rules](https://developers.google.com/identity/protocols/oauth2#expiration)
@@ -96,15 +96,13 @@ The live service sends login codes, account verification, and notifications thro
 
    ```dotenv
    EMAIL_BACKEND=accounts.email_backends.GmailAPIBackend
-   EMAIL_FROM_ADDRESS=faccheck.help@gmail.com
+   EMAIL_FROM_ADDRESS=
    GMAIL_CLIENT_ID=
    GMAIL_CLIENT_SECRET=
    GMAIL_REFRESH_TOKEN=
    ```
 
 5. If the Gmail backend is already deployed, choose **Save and deploy** to apply the settings to the existing build. Sign in to the live site to request a fresh login code, then confirm its sender and inbox placement. [Render environment settings](https://render.com/docs/configure-environment-variables#setting-environment-variables)
-
-The live deployment was verified with a login code delivered to the UDM Outlook Inbox.
 
 ### SMTP deployments
 
