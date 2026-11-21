@@ -13,7 +13,7 @@ The administrative dashboard shows report trends and resolution times. Administr
 
 ### Photo classification
 
-The deployed application uses a TensorFlow/Keras model. Its [seven categories](ml/class_labels.json) cover carpentry and masonry, electrical, others, painting, plumbing, refrigeration and air conditioning units, and vehicle check-up. The [inference configuration](ml/inference_config.json) defines when to flag an image for review.
+Fac-Check runs its trained MobileNetV2 CNN using LiteRT for inference. Its [seven categories](ml/class_labels.json) cover carpentry and masonry, electrical, others, painting, plumbing, refrigeration and air conditioning units, and vehicle check-up. The [inference configuration](ml/inference_config.json) defines when to flag an image for review.
 
 ## Tech stack
 
@@ -22,7 +22,7 @@ The deployed application uses a TensorFlow/Keras model. Its [seven categories](m
 | Web application | Python 3.13, Django 6, Tailwind CSS, JavaScript |
 | Data and uploads | PostgreSQL, Cloudinary |
 | Live notifications | Django Channels and Redis |
-| Photo classification | TensorFlow and Keras |
+| Photo classification | MobileNetV2 CNN and LiteRT |
 | Support and outputs | Gemini FAQ chatbot, SMTP or Gmail API email, xhtml2pdf |
 
 ## Run locally
@@ -115,7 +115,7 @@ Django loads `EMAIL_HOST_PASSWORD` for the default SMTP backend. The provider co
 | [`accounts/`](accounts/) | Registration, sign-in, email verification, and account recovery |
 | [`user/`](user/) | Concern submission, status tracking, surveys, and notifications |
 | [`adm/`](adm/) | MED dashboard, Job Orders, personnel, and maintenance records |
-| [`ml/`](ml/) | Keras model, inference code, and category configuration |
+| [`ml/`](ml/) | Original Keras model, LiteRT export, inference code, and category configuration |
 | [`theme/`](theme/) | Shared templates and Tailwind source |
 | [`config/`](config/) | Django settings, routing, and ASGI entry point |
 
