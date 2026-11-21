@@ -61,12 +61,16 @@ Start with [`.env.example`](.env.example). Keep actual credentials in your local
 | `REDIS_URL` | Redis-compatible connection URL, required when `DEBUG=False` |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Cloudinary credentials for uploaded media |
 | `GEMINI_API_KEY` | Key for the FAQ chatbot |
-| `EMAIL_HOST_PASSWORD` | SMTP password or SMTP key when using the default SMTP backend |
-| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_FROM_ADDRESS` | SMTP endpoint, login, and verified sender address. The defaults are for Gmail. |
+| `EMAIL_BACKEND` | Django email backend. The default is SMTP. Set `accounts.email_backends.GmailAPIBackend` to select the Gmail API. |
+| `EMAIL_FROM_ADDRESS` | Sender address for the selected backend |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | Google OAuth client credentials and the sender account's refresh token. Required for the Gmail API backend. |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | SMTP server, port, login, and password or SMTP key. Used by the SMTP backend. |
 
 ## Deploy on Render
 
-Create a **Python Web Service** from this repository's `main` branch. For a Free deployment, select **Free** during manual setup. The checked-in [Render Blueprint](render.yaml) selects the Starter plan.
+The live Fac-Check site runs on a Render Free web service connected to this repository's `main` branch. [Open Fac-Check](https://fac-check-free.onrender.com/)
+
+To set up another instance, create a **Python Web Service** from `main` and select **Free** during manual setup. The checked-in [Render Blueprint](render.yaml) selects the Starter plan.
 
 | Setting | Value |
 | --- | --- |
@@ -76,28 +80,35 @@ Create a **Python Web Service** from this repository's `main` branch. For a Free
 | Health check path | `/auth/index/` |
 | Runtime settings | `DEBUG=False`, `BEHIND_PROXY=True`, `WEB_CONCURRENCY=1` |
 
-- Set the environment variables above in Render. For an existing Supabase database, use its [Session pooler connection URL](https://supabase.com/docs/guides/database/connecting-to-postgres#shared-pooler-session-mode). For Render Key Value, use the internal URL from an instance in the same region as the web service.
-- For Brevo on Render Free, set `EMAIL_HOST=smtp-relay.brevo.com` and `EMAIL_PORT=2525`. Use the Brevo SMTP login, SMTP key, and verified sender address for the corresponding email variables.
+- Set the app variables and the settings for your chosen email backend in Render. For an existing Supabase database, use its [Session pooler connection URL](https://supabase.com/docs/guides/database/connecting-to-postgres#shared-pooler-session-mode). For Render Key Value, use the internal URL from an instance in the same region as the web service.
 - Fac-Check reads the generated `.onrender.com` hostname and HTTPS URL automatically. For a custom domain, set `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, and `SITE_URL`.
 - [`build.sh`](build.sh) installs dependencies, builds Tailwind CSS, collects static files, and runs Django migrations against `DATABASE_URL`. Back up an existing database before deploying schema changes. Before sharing the deployment, test verification email delivery, photo classification, and live notifications.
 
-### Use Gmail on Render Free
+### Gmail API on Render Free
 
-Render Free blocks outbound Gmail SMTP ports. Use the Gmail API over HTTPS to send from the Fac-Check Gmail account.
+The live service sends login codes, account verification, and notifications through the Gmail API as `faccheck.help@gmail.com`. The API uses HTTPS. Render Free blocks outbound connections on the standard SMTP ports `25`, `465`, and `587`. [Render Free networking limits](https://render.com/docs/free#other-limitations)
 
 1. Enable the [Gmail API](https://developers.google.com/workspace/gmail/api/quickstart/python) in a Google Cloud project and create a **Desktop app** OAuth client. Choose the send-only [`gmail.send` scope](https://developers.google.com/workspace/gmail/api/auth/scopes).
-2. Authorize the client from the Fac-Check sender account using the [installed app OAuth flow](https://developers.google.com/identity/protocols/oauth2/native-app) with offline access. Store the resulting refresh token privately alongside the client ID and secret. Google issues refresh tokens that expire after seven days for External projects in Testing mode with this scope. [Refresh token rules](https://developers.google.com/identity/protocols/oauth2#expiration)
-3. Test mail from the sender account before changing the live service. When ready, set the following values in Render's Environment settings and deploy.
+2. For an External OAuth app, set its publishing status to **In production** before authorizing the sender for the live service. Google issues refresh tokens that expire after seven days for External apps in **Testing** with this scope. [Refresh token rules](https://developers.google.com/identity/protocols/oauth2#expiration)
+3. Authorize the client from the account that matches `EMAIL_FROM_ADDRESS`. Use the [installed app OAuth flow](https://developers.google.com/identity/protocols/oauth2/native-app) with offline access to get a refresh token.
+4. In the Render dashboard, open the web service's **Environment** page and fill in these settings. Keep the OAuth credential values in Render.
 
-```dotenv
-EMAIL_BACKEND=accounts.email_backends.GmailAPIBackend
-EMAIL_FROM_ADDRESS=faccheck.help@gmail.com
-GMAIL_CLIENT_ID=
-GMAIL_CLIENT_SECRET=
-GMAIL_REFRESH_TOKEN=
-```
 
-The Gmail account granting access must match `EMAIL_FROM_ADDRESS`. Keep secrets in Render's environment settings or a private local `.env`.
+   ```dotenv
+   EMAIL_BACKEND=accounts.email_backends.GmailAPIBackend
+   EMAIL_FROM_ADDRESS=faccheck.help@gmail.com
+   GMAIL_CLIENT_ID=
+   GMAIL_CLIENT_SECRET=
+   GMAIL_REFRESH_TOKEN=
+   ```
+
+5. If the Gmail backend is already deployed, choose **Save and deploy** to apply the settings to the existing build. Sign in to the live site to request a fresh login code, then confirm its sender and inbox placement. [Render environment settings](https://render.com/docs/configure-environment-variables#setting-environment-variables)
+
+The live deployment was verified with a login code delivered to the UDM Outlook Inbox.
+
+### SMTP deployments
+
+Django loads `EMAIL_HOST_PASSWORD` for the default SMTP backend. The provider comes from `EMAIL_HOST`. To use Brevo SMTP on another Render Free deployment, set `EMAIL_HOST=smtp-relay.brevo.com`, `EMAIL_PORT=2525`, and supply the Brevo SMTP login, key, and verified sender address.
 
 ## Repository layout
 
